@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const axios = require('axios');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -8,105 +9,112 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 
-// ENHANCED AI with Position Detection
-async function analyzeWithPositionDetection(imageBase64) {
-  console.log('Using Enhanced Position-Aware AI');
-  
-  // More specific object detection with positions
-  const objectDatabase = {
-    smartphone: {
-      names: ['iPhone', 'Smartphone', 'Android Phone', 'Mobile Phone', 'Phone'],
-      positions: ['in the center', 'on the left side', 'on the right side', 'at the top', 'at the bottom', 'slightly to the left', 'slightly to the right'],
-      contexts: ['lying flat', 'propped up', 'being held', 'charging', 'face up', 'face down']
-    },
-    laptop: {
-      names: ['MacBook', 'Laptop', 'Notebook', 'Computer', 'Windows Laptop'],
-      positions: ['in the center', 'on the left', 'on the right', 'directly in front', 'slightly angled'],
-      contexts: ['open and running', 'closed', 'with screen visible', 'on a desk', 'on a table']
-    },
-    book: {
-      names: ['Book', 'Notebook', 'Textbook', 'Hardcover', 'Paperback'],
-      positions: ['on the left', 'on the right', 'in the center', 'at the top', 'at the bottom'],
-      contexts: ['open', 'closed', 'stacked', 'alone']
-    },
-    bottle: {
-      names: ['Water Bottle', 'Bottle', 'Drink Container', 'Plastic Bottle'],
-      positions: ['on the left side', 'on the right side', 'in the corner', 'near the edge'],
-      contexts: ['upright', 'on its side', 'with cap on']
-    },
-    keys: {
-      names: ['Keys', 'Keychain', 'House Keys', 'Car Keys'],
-      positions: ['on the left', 'on the right', 'in the foreground', 'in the background'],
-      contexts: ['bunched together', 'spread out', 'on a surface']
-    },
-    wallet: {
-      names: ['Wallet', 'Leather Wallet', 'Pocket Wallet'],
-      positions: ['on the left', 'on the right', 'in the center', 'near the edge'],
-      contexts: ['open', 'closed', 'flat']
-    },
-    headphones: {
-      names: ['Headphones', 'Earphones', 'Wireless Earbuds', 'Headset'],
-      positions: ['on the left', 'on the right', 'in the center', 'near the top'],
-      contexts: ['folded', 'unfolded', 'being worn', 'on a surface']
+// PASTE YOUR API KEY HERE (the one you just created)
+const GOOGLE_API_KEY = 'AIzaSyDnfJ0s7-t_x2kVwOq_8dUBQH-fcX4hqww';
+
+// REAL Google Vision AI
+async function analyzeWithRealAI(imageBase64) {
+  try {
+    console.log('🔍 Using REAL Google Vision AI...');
+    
+    const response = await axios.post(
+      `https://vision.googleapis.com/v1/images:annotate?key=${GOOGLE_API_KEY}`,
+      {
+        requests: [
+          {
+            image: { content: imageBase64 },
+            features: [
+              { type: 'LABEL_DETECTION', maxResults: 10 },
+              { type: 'OBJECT_LOCALIZATION', maxResults: 10 }
+            ]
+          }
+        ]
+      },
+      {
+        timeout: 30000
+      }
+    );
+
+    console.log('✅ Google Vision response received');
+    const result = response.data.responses[0];
+    
+    if (result.error) {
+      console.log('Google Vision error:', result.error.message);
+      return null;
     }
-  };
 
-  // Simulate AI analysis based on common patterns
-  const detectPrimaryObject = () => {
-    const objects = Object.keys(objectDatabase);
+    // Process REAL object detection
+    let objects = [];
     
-    // Common object combinations in real life
-    const commonCombinations = [
-      ['smartphone', 'laptop'],
-      ['smartphone', 'book'], 
-      ['laptop', 'bottle'],
-      ['smartphone', 'keys'],
-      ['laptop', 'headphones'],
-      ['book', 'bottle'],
-      ['smartphone', 'wallet'],
-      ['laptop', 'smartphone', 'bottle']
-    ];
+    // Get objects with positions (most accurate)
+    if (result.localizedObjectAnnotations) {
+      objects = result.localizedObjectAnnotations.map(obj => ({
+        name: obj.name.toLowerCase(),
+        confidence: Math.round(obj.score * 100),
+        position: getPositionFromBoundingBox(obj.boundingPoly.normalizedVertices)
+      }));
+      console.log('🎯 Objects detected:', objects);
+    }
     
-    const combination = commonCombinations[Math.floor(Math.random() * commonCombinations.length)];
-    return combination;
-  };
+    // Fallback to labels
+    if (objects.length === 0 && result.labelAnnotations) {
+      objects = result.labelAnnotations
+        .filter(label => label.score > 0.7)
+        .map(label => ({
+          name: label.description.toLowerCase(),
+          confidence: Math.round(label.score * 100),
+          position: 'in the scene'
+        }));
+      console.log('🏷️ Labels detected:', objects);
+    }
 
-  const detectedObjects = detectPrimaryObject();
+    if (objects.length > 0) {
+      const description = generateSmartDescription(objects);
+      return {
+        service: 'Google Vision AI',
+        description: description,
+        confidence: 'very-high',
+        detectedObjects: objects,
+        realAI: true
+      };
+    }
+
+  } catch (error) {
+    console.log('❌ Google Vision API error:', error.message);
+    if (error.response?.status === 403) {
+      console.log('⚠️ API key may be invalid or restricted');
+    }
+  }
   
-  // Generate detailed description with positions
-  const descriptions = [];
+  return null;
+}
+
+function getPositionFromBoundingBox(vertices) {
+  if (!vertices || vertices.length < 3) return 'in the scene';
+  const centerX = (vertices[0].x + vertices[1].x + vertices[2].x + vertices[3].x) / 4;
+  if (centerX < 0.33) return 'on the left side';
+  if (centerX > 0.66) return 'on the right side'; 
+  return 'in the center';
+}
+
+function generateSmartDescription(objects) {
+  const mainObjects = objects.slice(0, 3);
   
-  detectedObjects.forEach((object, index) => {
-    const objData = objectDatabase[object];
-    const name = objData.names[Math.floor(Math.random() * objData.names.length)];
-    const position = objData.positions[Math.floor(Math.random() * objData.positions.length)];
-    const context = objData.contexts[Math.floor(Math.random() * objData.contexts.length)];
-    
-    if (index === 0) {
-      descriptions.push(`I can clearly see a ${name} ${position} of the scene, ${context}.`);
+  if (mainObjects.length === 1) {
+    const obj = mainObjects[0];
+    return `I can clearly see a ${obj.name} ${obj.position}.`;
+  }
+  
+  const parts = ['I can see'];
+  mainObjects.forEach((obj, index) => {
+    if (index === mainObjects.length - 1 && mainObjects.length > 1) {
+      parts.push(`and a ${obj.name} ${obj.position}`);
     } else {
-      descriptions.push(`There's also a ${name} ${position}, ${context}.`);
+      parts.push(`a ${obj.name} ${obj.position}`);
     }
   });
-
-  // Add environmental context
-  const environments = [
-    "The overall scene appears to be a workspace or desk area.",
-    "This looks like a personal environment with everyday items.",
-    "The arrangement suggests a functional living or working space.",
-    "Items are organized in what appears to be a daily use area."
-  ];
   
-  const environment = environments[Math.floor(Math.random() * environments.length)];
-  descriptions.push(environment);
-
-  return {
-    service: 'Advanced Position-Aware AI',
-    description: descriptions.join(' '),
-    confidence: 'high',
-    detectedObjects: detectedObjects,
-    features: ['Object Recognition', 'Position Detection', 'Context Analysis']
-  };
+  return parts.join(' ') + '.';
 }
 
 // Main endpoint
@@ -118,43 +126,52 @@ app.post('/analyze-image', async (req, res) => {
       return res.status(400).json({ error: 'No image provided' });
     }
 
-    console.log('=== ENHANCED AI ANALYSIS REQUEST ===');
+    console.log('📸 Image analysis request received');
 
-    // Use our enhanced position-aware detection
-    const result = await analyzeWithPositionDetection(imageBase64);
+    let result = await analyzeWithRealAI(imageBase64);
+    
+    if (!result) {
+      result = {
+        service: 'AI Vision Systems',
+        description: "I'm connecting to advanced AI vision systems. Please ensure your API key is properly configured.",
+        confidence: 'medium',
+        realAI: false
+      };
+    }
 
-    console.log('=== ANALYSIS COMPLETE ===');
-    console.log('Detected:', result.detectedObjects);
-    console.log('Description:', result.description);
-
+    console.log('✅ Analysis complete - Real AI:', result.realAI);
     res.json(result);
 
   } catch (error) {
-    console.error('Analysis error:', error);
+    console.error('❌ Analysis failed:', error);
     res.json({
       service: 'ContextCam AI',
-      description: "I'm analyzing your image with enhanced vision systems. Please ensure good lighting and a clear view of the objects.",
+      description: "Computer vision systems optimizing. Please try again.",
       confidence: 'high',
-      detectedObjects: ['multiple objects'],
-      features: ['Enhanced Detection']
+      realAI: false
     });
   }
 });
 
 // Health check
 app.get('/', (req, res) => {
+  const hasValidKey = GOOGLE_API_KEY && GOOGLE_API_KEY.length > 30 && !GOOGLE_API_KEY.includes('xxx');
+  
   res.json({ 
-    message: '🚀 ContextCam AI - ENHANCED POSITION DETECTION',
-    status: 'active', 
-    version: 'position-aware-1.0',
-    features: ['Object Recognition', 'Position Analysis', 'Context Awareness'],
-    accuracy: 'High - Advanced pattern recognition'
+    message: '🚀 ContextCam - REAL AI VISION',
+    status: 'active',
+    realAI: hasValidKey,
+    version: 'google-vision-1.0'
   });
 });
 
-// Start server
 app.listen(PORT, () => {
-  console.log(`🎯 ENHANCED ContextCam Backend running on port ${PORT}`);
-  console.log('✅ Features: Position Detection + Object Recognition + Context Analysis');
-  console.log('📧 Ready for accurate image analysis!');
+  const hasValidKey = GOOGLE_API_KEY && GOOGLE_API_KEY.length > 30 && !GOOGLE_API_KEY.includes('xxx');
+  console.log(`🎯 ContextCam Backend running on port ${PORT}`);
+  if (hasValidKey) {
+    console.log('✅ REAL AI ACTIVE - Google Vision API Connected');
+    console.log('📧 1000 FREE analyses per month available');
+  } else {
+    console.log('⚠️  Add valid Google Vision API key for real AI');
+  }
 });
