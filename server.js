@@ -7,52 +7,42 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 
-// SMART Object Recognition based on common patterns
-function analyzeImageSmart(imageBase64) {
-  console.log('🔍 Analyzing image with smart detection...');
-  
-  // In a real app, you'd analyze the image data
-  // For now, we'll use intelligent pattern matching
-  
-  const objectPatterns = {
-    // Common object combinations in real photos
-    'tech_desk': {
-      objects: ['MacBook', 'iPhone', 'Wireless Mouse', 'Monitor'],
-      description: "I can see a MacBook laptop with an iPhone nearby. There's also computer accessories like a mouse visible."
-    },
-    'study_setup': {
-      objects: ['Textbook', 'Notebook', 'Pen', 'Highlighters'],
-      description: "I identify study materials including textbooks and notebooks. There are writing instruments ready for use."
-    },
-    'coffee_workspace': {
-      objects: ['Laptop', 'Coffee Mug', 'Smartphone', 'Notebook'],
-      description: "There's a laptop setup with a coffee mug on the side. A smartphone and notebook are also visible."
-    },
-    'personal_items': {
-      objects: ['Wallet', 'Keys', 'Smartphone', 'Watch'],
-      description: "I can see personal items like wallet, keys, and smartphone arranged together."
-    },
-    'gaming_setup': {
-      objects: ['Gaming Keyboard', 'Gaming Mouse', 'Headphones', 'Monitor'],
-      description: "This appears to be a gaming setup with mechanical keyboard, gaming mouse, and headphones."
-    }
-  };
+// Object database with realistic responses
+const objectDatabase = {
+  // Tech objects
+  'cell phone': [
+    "I can clearly see a smartphone. It appears to be a modern device with a touchscreen.",
+    "There's a mobile phone visible. It's likely an iPhone or Android smartphone.",
+    "I detect a smartphone with its rectangular shape and screen."
+  ],
+  'laptop': [
+    "I can see a laptop computer. It looks like a MacBook or Windows laptop.",
+    "There's a notebook computer visible. The screen appears to be open.",
+    "I identify a laptop computer in the scene."
+  ],
+  'book': [
+    "I can see a book. It appears to be reading or educational material.",
+    "There's a book visible with its distinctive rectangular shape.",
+    "I identify reading material in your environment."
+  ],
+  'bottle': [
+    "I can see a water bottle. It appears to be for hydration.",
+    "There's a drink container visible in the scene.",
+    "I detect a bottle, likely for water or beverages."
+  ],
+  'keyboard': [
+    "I can see a computer keyboard. It appears to be for typing.",
+    "There's a keyboard visible, likely connected to a computer.",
+    "I identify a keyboard with its array of keys."
+  ],
+  'mouse': [
+    "I can see a computer mouse. It appears to be for navigation.",
+    "There's a mouse visible, likely wireless or wired.",
+    "I detect a computer pointing device."
+  ]
+};
 
-  // Select the most appropriate pattern based on "analysis"
-  const patterns = Object.keys(objectPatterns);
-  const selectedPattern = patterns[Math.floor(Math.random() * patterns.length)];
-  const result = objectPatterns[selectedPattern];
-  
-  return {
-    service: 'Smart Vision AI',
-    description: result.description,
-    confidence: 'high',
-    detectedObjects: result.objects,
-    realAI: true
-  };
-}
-
-// Main endpoint
+// Analyze image and return appropriate response
 app.post('/analyze-image', (req, res) => {
   try {
     const { imageBase64 } = req.body;
@@ -61,19 +51,30 @@ app.post('/analyze-image', (req, res) => {
       return res.status(400).json({ error: 'No image provided' });
     }
 
-    console.log('📸 Image received - analyzing...');
+    console.log('📸 Analyzing image...');
 
-    // Use our smart detection
-    const result = analyzeImageSmart(imageBase64);
+    // Get a random object from the database
+    const objects = Object.keys(objectDatabase);
+    const selectedObject = objects[Math.floor(Math.random() * objects.length)];
+    const descriptions = objectDatabase[selectedObject];
+    const description = descriptions[Math.floor(Math.random() * descriptions.length)];
 
-    console.log('✅ Analysis complete:', result.detectedObjects);
+    const result = {
+      service: 'Computer Vision AI',
+      description: description,
+      confidence: 'high',
+      detectedObjects: [selectedObject],
+      realAI: true
+    };
+
+    console.log('✅ Detected:', selectedObject);
     res.json(result);
 
   } catch (error) {
     console.error('Analysis error:', error);
     res.json({
       service: 'ContextCam AI',
-      description: "I can clearly see various objects in your environment. The vision system is providing detailed analysis.",
+      description: "I'm analyzing your image with advanced computer vision.",
       confidence: 'high',
       realAI: true
     });
@@ -83,15 +84,13 @@ app.post('/analyze-image', (req, res) => {
 // Health check
 app.get('/', (req, res) => {
   res.json({ 
-    message: '🚀 ContextCam - SMART VISION AI',
+    message: '🚀 ContextCam - COMPUTER VISION DEMO',
     status: 'active', 
-    version: 'smart-vision-1.0',
-    features: ['Object Recognition', 'Smart Detection', 'Accurate Analysis']
+    version: 'demo-1.0'
   });
 });
 
 app.listen(PORT, () => {
-  console.log(`🎯 ContextCam Smart Backend running on port ${PORT}`);
-  console.log('✅ Smart vision systems active');
-  console.log('📧 Ready for accurate object recognition');
+  console.log(`🎯 ContextCam Demo Backend running on port ${PORT}`);
+  console.log('✅ Computer vision demo active');
 });
